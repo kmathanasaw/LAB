@@ -90,7 +90,7 @@ import ij.process.ImageStatistics
 
 // ---- Where are the files? ----------------------------------------------------
 // Exactly the same OUTPUT_FOLDER as in Part 1.  Use forward slashes  /  .
-OUTPUT_FOLDER = "D:/Dissertation/QuPath Analysis/Output/PFC"
+OUTPUT_FOLDER = "E:/VA Chronic stress GluN1 + psd95 staining/PFC analysis"
 
 
 // ---- Which steps should run? -------------------------------------------------
@@ -106,7 +106,7 @@ RUN_ANALYZE = true     // channel images   ->  bgsub, threshold, measure, CSV
 
 // ---- Pixel size --------------------------------------------------------------
 // Size of ONE pixel of the exported TIFFs in micrometres. It depends on the
-// objective used on the VS200 (e.g. 0.137 or 0.274). It is what turns pixel
+// objective used on the VS200 (e.g. 40x = 0.137 and 20x = 0.274). It is what turns pixel
 // counts into um^2 in the CSV.  Part 1 prints the right number in its log.
 PIXEL_SIZE_UM = 0.137
 
@@ -163,7 +163,8 @@ CHANNELS = [
 MEASURE_INSIDE_ANNOTATION_ONLY = true
 
 // Names of the sub-folders.  EXPORT_SUBFOLDER must be the same as in Part 1.
-EXPORT_SUBFOLDER      = "1_exported_tiffs"
+EXPORT_SUBFOLDER      = "Multichannel Tiffs"
+SPLIT_ORIGINAL_SUBFOLDER = "split_original"
 UNPROCESSED_SUBFOLDER = "unprocessed"
 BGSUB_SUBFOLDER       = "bgsub"
 THRESH_SUBFOLDER      = "thresh"
@@ -281,6 +282,7 @@ def stepA_splitChannels(File tiffFile) {
         }
 
         ImageProcessor pixels8bit
+        ImageProcessor originalPixels
         def rangeText
 
         if (isColourPhoto) {
@@ -289,12 +291,17 @@ def stepA_splitChannels(File tiffFile) {
             byte[] r = new byte[total]; byte[] g = new byte[total]; byte[] b = new byte[total]
             ((ColorProcessor) image.getProcessor()).getRGB(r, g, b)
             pixels8bit = new ByteProcessor(image.getWidth(), image.getHeight(), [r, g, b][channel.number - 1])
+            // Save a copy of the original RGB channel.
+            originalPixels = pixels8bit.duplicate()
             rangeText = "0-255"
         } else {
             // Take a copy of just this channel's pixels.
             image.setPosition(channel.number, 1, 1)
             ImageProcessor pixels = image.getStack().getProcessor(image.getStackIndex(channel.number, 1, 1)).duplicate()
 
+            // Keep a separate copy at the original bit depth.
+            originalPixels = pixels.duplicate()
+            
             if (pixels.getBitDepth() == 8) {
                 // Already 8-bit: nothing to convert.
                 pixels8bit = pixels
@@ -320,6 +327,21 @@ def stepA_splitChannels(File tiffFile) {
         }
 
         // Wrap the pixels up as a new image, attach the region to measure, and save it.
+        // Save the original split channel before 8-bit conversion.
+        def originalImage = new ImagePlus(
+            imageName + channelSuffix(channel) + "_original",
+            originalPixels
+        )
+        originalImage.setRoi(region)
+        
+        def originalFile = new File(
+            new File(channelFolder(channel), SPLIT_ORIGINAL_SUBFOLDER),
+            imageName + channelSuffix(channel) + "_original.tif"
+        )
+        
+        saveTiff(originalImage, originalFile)
+        originalImage.close()
+        
         def channelImage = new ImagePlus(imageName + channelSuffix(channel), pixels8bit)
         channelImage.setRoi(region)
         // A short note stored inside the TIFF; step B reads it back for the CSV.
