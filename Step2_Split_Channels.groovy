@@ -6,7 +6,7 @@
  *
  * Output for each channel:
  *   original/          untouched split channel at its original bit depth
- *   ready_for_analysis/  8-bit copy for your manual Fiji corrections
+ *   ready_for_analysis/  working copy at its original bit depth
  *
  * After this script finishes, open the ready_for_analysis images in Fiji,
  * use your usual lasso + Process > Math > Subtract workflow, and SAVE the
@@ -76,51 +76,30 @@ def splitOneTiff(File tiffFile) {
                     " channel(s); skipping " + channel.name
             continue
         }
-
-        ImageProcessor pixels8bit
         ImageProcessor originalPixels
         String rangeText
 
-        if (isColourPhoto) {
-            int total = image.getWidth() * image.getHeight()
-            byte[] r = new byte[total]
-            byte[] g = new byte[total]
-            byte[] b = new byte[total]
-            ((ColorProcessor) image.getProcessor()).getRGB(r, g, b)
-            pixels8bit = new ByteProcessor(image.getWidth(), image.getHeight(),
-                    [r, g, b][channel.number - 1])
-            originalPixels = pixels8bit.duplicate()
-            rangeText = "0-255"
-        } else {
-            image.setPosition(channel.number, 1, 1)
-            ImageProcessor pixels = image.getStack()
-                    .getProcessor(image.getStackIndex(channel.number, 1, 1)).duplicate()
-            originalPixels = pixels.duplicate()
+       if (isColourPhoto) {
+    int total = image.getWidth() * image.getHeight()
+    byte[] r = new byte[total]
+    byte[] g = new byte[total]
+    byte[] b = new byte[total]
+    ((ColorProcessor) image.getProcessor()).getRGB(r, g, b)
 
-            if (pixels.getBitDepth() == 8) {
-                pixels8bit = pixels
-                rangeText = "0-255"
-            } else {
-                double low, high
-                if (channel.eightBitRange != null) {
-                    low = channel.eightBitRange[0]
-                    high = channel.eightBitRange[1]
-                } else {
-                    low = image.getDisplayRangeMin()
-                    high = image.getDisplayRangeMax()
-                    if (!(high > low)) {
-                        pixels.resetMinAndMax()
-                        low = pixels.getMin()
-                        high = pixels.getMax()
-                    }
-                }
-                pixels.setMinAndMax(low, high)
-                rangeText = Math.round(low) + "-" + Math.round(high)
-            }
-        }
+    workingPixels = new ByteProcessor(image.getWidth(), image.getHeight(),
+            [r, g, b][channel.number - 1])
 
-        String suffix = channelSuffix(channel)
+    originalPixels = workingPixels.duplicate()
 
+} else {
+    image.setPosition(channel.number, 1, 1)
+
+    ImageProcessor pixels = image.getStack()
+            .getProcessor(image.getStackIndex(channel.number, 1, 1)).duplicate()
+
+    originalPixels = pixels.duplicate()
+    workingPixels = pixels.duplicate()
+}
         // Save untouched original-depth split channel.
         ImagePlus originalImage = new ImagePlus(imageName + suffix + "_original", originalPixels)
         if (outline != null) originalImage.setRoi(outline)
@@ -129,10 +108,10 @@ def splitOneTiff(File tiffFile) {
         saveTiff(originalImage, originalFile)
         originalImage.close()
 
-        // Save 8-bit copy that you will manually correct.
-        ImagePlus readyImage = new ImagePlus(imageName + suffix, pixels8bit)
+      // Save working copy at its original bit depth for manual correction.
+        ImagePlus readyImage = new ImagePlus(imageName + suffix, workingPixels)
         if (outline != null) readyImage.setRoi(outline)
-        readyImage.setProperty("Info", "EightBitRange=" + rangeText)
+        
         File readyFolder = new File(channelFolder(channel), READY_SUBFOLDER)
         File readyFile = new File(readyFolder, imageName + suffix + ".tif")
         if (saveTiff(readyImage, readyFile)) {
@@ -142,7 +121,8 @@ def splitOneTiff(File tiffFile) {
                 File roiFile = new File(readyFolder, imageName + suffix + "_annotation.roi")
                 new RoiEncoder(roiFile.getAbsolutePath()).write(outline)
             }
-            println "   split: " + readyFile.getName() + " (8-bit range " + rangeText + ")"
+           println "   split: " + readyFile.getName() +
+        " (" + readyImage.getBitDepth() + "-bit)"
         }
         readyImage.close()
     }
