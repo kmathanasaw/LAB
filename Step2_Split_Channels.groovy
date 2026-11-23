@@ -115,7 +115,6 @@ def splitOneTiff(File tiffFile) {
                     }
                 }
                 pixels.setMinAndMax(low, high)
-                pixels8bit = pixels.convertToByte(true)
                 rangeText = Math.round(low) + "-" + Math.round(high)
             }
         }
