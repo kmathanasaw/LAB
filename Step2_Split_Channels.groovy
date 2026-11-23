@@ -70,65 +70,79 @@ def splitOneTiff(File tiffFile) {
     boolean isColourPhoto = (image.getBitDepth() == 24)
     int channelCount = isColourPhoto ? 3 : image.getNChannels()
 
-    for (channel in CHANNELS) {
-        if (channel.number > channelCount) {
-            println "WARNING: " + imageName + " has only " + channelCount +
-                    " channel(s); skipping " + channel.name
-            continue
-        }
-        ImageProcessor originalPixels
-        String rangeText
 
-       if (isColourPhoto) {
-    int total = image.getWidth() * image.getHeight()
-    byte[] r = new byte[total]
-    byte[] g = new byte[total]
-    byte[] b = new byte[total]
-    ((ColorProcessor) image.getProcessor()).getRGB(r, g, b)
-
-    workingPixels = new ByteProcessor(image.getWidth(), image.getHeight(),
-            [r, g, b][channel.number - 1])
-
-    originalPixels = workingPixels.duplicate()
-
-} else {
-    image.setPosition(channel.number, 1, 1)
-
-    ImageProcessor pixels = image.getStack()
-            .getProcessor(image.getStackIndex(channel.number, 1, 1)).duplicate()
-
-    originalPixels = pixels.duplicate()
-    workingPixels = pixels.duplicate()
-}
-        // Save untouched original-depth split channel.
-        ImagePlus originalImage = new ImagePlus(imageName + suffix + "_original", originalPixels)
-        if (outline != null) originalImage.setRoi(outline)
-        File originalFile = new File(new File(channelFolder(channel), ORIGINAL_SUBFOLDER),
-                imageName + suffix + "_original.tif")
-        saveTiff(originalImage, originalFile)
-        originalImage.close()
-
-      // Save working copy at its original bit depth for manual correction.
-        ImagePlus readyImage = new ImagePlus(imageName + suffix, workingPixels)
-        if (outline != null) readyImage.setRoi(outline)
-        
-        File readyFolder = new File(channelFolder(channel), READY_SUBFOLDER)
-        File readyFile = new File(readyFolder, imageName + suffix + ".tif")
-        if (saveTiff(readyImage, readyFile)) {
-            // Save the annotation boundary separately so Step 3 can restore it
-            // even if the active lasso selection changes during manual editing.
-            if (outline != null) {
-                File roiFile = new File(readyFolder, imageName + suffix + "_annotation.roi")
-                new RoiEncoder(roiFile.getAbsolutePath()).write(outline)
-            }
-           println "   split: " + readyFile.getName() +
-        " (" + readyImage.getBitDepth() + "-bit)"
-        }
-        readyImage.close()
+for (channel in CHANNELS) {
+    if (channel.number > channelCount) {
+        println "WARNING: " + imageName + " has only " + channelCount +
+                " channel(s); skipping " + channel.name
+        continue
     }
-    image.close()
+
+    ImageProcessor workingPixels
+    ImageProcessor originalPixels
+
+    if (isColourPhoto) {
+        int total = image.getWidth() * image.getHeight()
+        byte[] r = new byte[total]
+        byte[] g = new byte[total]
+        byte[] b = new byte[total]
+
+        ((ColorProcessor) image.getProcessor()).getRGB(r, g, b)
+
+        workingPixels = new ByteProcessor(image.getWidth(), image.getHeight(),
+                [r, g, b][channel.number - 1])
+
+        originalPixels = workingPixels.duplicate()
+
+    } else {
+        image.setPosition(channel.number, 1, 1)
+
+        ImageProcessor pixels = image.getStack()
+                .getProcessor(image.getStackIndex(channel.number, 1, 1)).duplicate()
+
+        originalPixels = pixels.duplicate()
+        workingPixels = pixels.duplicate()
+    }
+
+    String suffix = channelSuffix(channel)
+
+    // Save untouched original-depth split channel.
+    ImagePlus originalImage = new ImagePlus(
+            imageName + suffix + "_original", originalPixels)
+
+    if (outline != null) originalImage.setRoi(outline)
+
+    File originalFile = new File(
+            new File(channelFolder(channel), ORIGINAL_SUBFOLDER),
+            imageName + suffix + "_original.tif")
+
+    saveTiff(originalImage, originalFile)
+    originalImage.close()
+
+    // Save working copy at its original bit depth for manual correction.
+    ImagePlus readyImage = new ImagePlus(imageName + suffix, workingPixels)
+
+    if (outline != null) readyImage.setRoi(outline)
+
+    File readyFolder = new File(channelFolder(channel), READY_SUBFOLDER)
+    File readyFile = new File(readyFolder, imageName + suffix + ".tif")
+
+    if (saveTiff(readyImage, readyFile)) {
+        if (outline != null) {
+            File roiFile = new File(
+                    readyFolder, imageName + suffix + "_annotation.roi")
+            new RoiEncoder(roiFile.getAbsolutePath()).write(outline)
+        }
+
+        println "   split: " + readyFile.getName() +
+                " (" + readyImage.getBitDepth() + "-bit)"
+    }
+
+        readyImage.close()
 }
 
+image.close()
+}
 
 // ---------------- FIND THE QUPATH OUTLINE ----------------
 def findAnnotationOutline(ImagePlus image, String imageName) {
