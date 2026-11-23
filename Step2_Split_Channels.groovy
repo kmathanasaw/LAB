@@ -19,6 +19,7 @@ import ij.io.RoiEncoder
 import ij.process.ByteProcessor
 import ij.process.ColorProcessor
 import ij.process.ImageProcessor
+import ij.measure.Calibration
 
 // ---------------- SETTINGS ----------------
 OUTPUT_FOLDER = "E:/VA Chronic stress GluN1 + psd95 staining/PFC analysis"
@@ -38,6 +39,11 @@ CHANNELS = [
 ]
 
 OUTLINE_NAME = "QuPath annotation"
+
+// Image calibration
+PIXEL_WIDTH = 0.137
+PIXEL_HEIGHT = 0.137
+SPATIAL_UNIT = "um"
 
 // ---------------- MAIN PROGRAM ----------------
 exportFolder = new File(OUTPUT_FOLDER, EXPORT_SUBFOLDER)
@@ -105,12 +111,17 @@ for (channel in CHANNELS) {
     }
 
     String suffix = channelSuffix(channel)
+    
 
     // Save untouched original-depth split channel.
     ImagePlus originalImage = new ImagePlus(
             imageName + suffix + "_original", originalPixels)
 
     if (outline != null) originalImage.setRoi(outline)
+    // Apply spatial calibration
+    originalImage.getCalibration().pixelWidth = PIXEL_WIDTH
+    originalImage.getCalibration().pixelHeight = PIXEL_HEIGHT
+    originalImage.getCalibration().setUnit(SPATIAL_UNIT)
 
     File originalFile = new File(
             new File(channelFolder(channel), ORIGINAL_SUBFOLDER),
@@ -123,6 +134,11 @@ for (channel in CHANNELS) {
     ImagePlus readyImage = new ImagePlus(imageName + suffix, workingPixels)
 
     if (outline != null) readyImage.setRoi(outline)
+
+    // Apply spatial calibration
+    readyImage.getCalibration().pixelWidth = PIXEL_WIDTH
+    readyImage.getCalibration().pixelHeight = PIXEL_HEIGHT
+    readyImage.getCalibration().setUnit(SPATIAL_UNIT)
 
     File readyFolder = new File(channelFolder(channel), READY_SUBFOLDER)
     File readyFile = new File(readyFolder, imageName + suffix + ".tif")
