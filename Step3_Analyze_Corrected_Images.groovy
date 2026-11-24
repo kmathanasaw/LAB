@@ -37,7 +37,7 @@ CHANNELS = [
 
     [ number            : 1,
       name              : "GluN1",
-      rollingBallRadius : 150,
+      rollingBallRadius : 190,
       slidingParaboloid : true,
       lightBackground   : false,
       thresholdMin      : 24,
@@ -52,7 +52,7 @@ CHANNELS = [
       rollingBallRadius : 150,
       slidingParaboloid : true,
       lightBackground   : false,
-      thresholdMin      : 24,
+      thresholdMin      : 25,
       thresholdMax      : 255,
       eightBitRange     : null ],
 
@@ -130,11 +130,22 @@ def stepB_analyzeImage(File channelFile, Map channel, String imageName) {
     }
 
     // ---- Set Scale: tell ImageJ how big a pixel is ----
+    // Equivalent to ImageJ Analyze > Set Scale:
+    // Distance in pixels = 1
+    // Known distance = 0.137
+    // Pixel aspect ratio = 1
+    // Unit of length = um
+    
     double pixelSize = PIXEL_SIZE_UM
+    
     Calibration scale = image.getCalibration()
     scale.pixelWidth = pixelSize
     scale.pixelHeight = pixelSize
     scale.setUnit("um")
+    
+    // Confirm calibration
+    println "   SCALE CHECK: Distance = 1 pixel, Known = " +
+            pixelSize + " um, Pixel aspect ratio = 1, Unit = um"
 
     // ---- Subtract Background (rolling ball / sliding paraboloid) ----
     ImageProcessor pixels = image.getProcessor()
